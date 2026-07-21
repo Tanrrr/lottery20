@@ -32,4 +32,33 @@ describe.skipIf(!process.env.SUPABASE_SERVICE_ROLE_KEY)('SupabaseLeagueRepositor
       RevealConflictError
     )
   })
+
+  // Regression test for the data-integrity bug found during Task 21 E2E
+  // testing: replaceTeams() used to run a separate DELETE then INSERT
+  // (two round-trips, no transaction), so two overlapping PUT requests for
+  // the same league (e.g. a double-clicked "Save teams" button) could both
+  // run their DELETE before either INSERT landed, duplicating every team
+  // row (12 rows instead of 6, in the reproduction). replaceTeams() now
+  // calls the replace_league_teams() Postgres function (see
+  // supabase/migrations/0002_atomic_replace_teams.sql), which wraps the
+  // delete+insert in a single transaction so concurrent calls serialize at
+  // the database level instead of racing.
+  it('keeps exactly one set of teams when replaceTeams is called concurrently', async () => {
+    const league = await repo.createLeague({ name: 'Concurrency Test League', mode: 'random' })
+
+    const teamInputs = Array.from({ length: 6 }, (_, i) => ({ name: `Concurrent Team ${i}` }))
+
+    const [first, second] = await Promise.all([
+      repo.replaceTeams(league.commissionerToken, teamInputs),
+      repo.replaceTeams(league.commissionerToken, teamInputs),
+    ])
+
+    // Each call's own response should reflect a clean replace (6 rows), not
+    // a partial or duplicated set.
+    expect(first).toHaveLength(6)
+    expect(second).toHaveLength(6)
+
+    const finalState = await repo.getByCommissionerToken(league.commissionerToken)
+    expect(finalState?.teams).toHaveLength(6)
+  })
 })

@@ -84,13 +84,16 @@ export class SupabaseLeagueRepository implements LeagueRepository {
     const row = await this.findLeagueRow('commissioner_token', commissionerToken)
     if (!row) throw new Error('League not found')
 
-    const { error: deleteError } = await supabaseAdmin.from('teams').delete().eq('league_id', row.id)
-    if (deleteError) throw new Error(deleteError.message)
-
-    const { data, error } = await supabaseAdmin
-      .from('teams')
-      .insert(teams.map((t) => ({ league_id: row.id, name: t.name, weight: t.weight ?? null })))
-      .select()
+    // Delegates to the replace_league_teams() Postgres function (see
+    // supabase/migrations/0002_atomic_replace_teams.sql), which runs the
+    // delete+insert inside a single plpgsql transaction. This makes the
+    // operation atomic, so two overlapping calls for the same league (e.g. a
+    // double-clicked "Save teams" button) serialize instead of racing and
+    // duplicating rows.
+    const { data, error } = await supabaseAdmin.rpc('replace_league_teams', {
+      p_league_id: row.id,
+      p_teams: teams.map((t) => ({ name: t.name, weight: t.weight ?? null })),
+    })
 
     if (error) throw new Error(error.message)
     return (data ?? []).map(toTeam)
