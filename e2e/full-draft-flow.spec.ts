@@ -32,7 +32,16 @@ test('commissioner runs a random-mode draft and the viewer sees the final order'
   for (let i = 0; i < 6; i++) {
     await nameInputs.nth(i).fill(`Team ${i}`)
   }
-  await page.getByRole('button', { name: /^save teams$/i }).click()
+  // Wait for the save request to actually complete before moving on.
+  // "Start Draft" independently re-saves the team roster (it calls the same
+  // save logic internally), so if we clicked it before this PUT finished,
+  // two concurrent PUT /teams requests would race against each other.
+  await Promise.all([
+    page.waitForResponse(
+      (res) => res.url().includes('/teams') && res.request().method() === 'PUT'
+    ),
+    page.getByRole('button', { name: /^save teams$/i }).click(),
+  ])
 
   // The viewer link is only shown on the pre-draft setup view (it disappears
   // once the league goes live and the page switches to the LiveDraftView), so
@@ -59,7 +68,7 @@ test('commissioner runs a random-mode draft and the viewer sees the final order'
 
   // Playwright's toHaveCount polls/retries automatically, which absorbs the
   // realtime broadcast latency to the viewer's page without an arbitrary sleep.
-  await expect(viewerPage.getByText(/slot 1/i)).toBeVisible()
+  await expect(viewerPage.getByText(/^Slot 1 —/i)).toBeVisible()
   await expect(viewerPage.locator('text=/^Slot \\d+/')).toHaveCount(6)
 
   const commissionerOrder = await page.locator('text=/^Slot \\d+/').allTextContents()
