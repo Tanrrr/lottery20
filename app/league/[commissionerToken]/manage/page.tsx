@@ -3,10 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import type { League, Team } from '@/lib/types'
+import { MIN_WEIGHT } from '@/lib/constants'
 
 interface TeamInput {
   name: string
   weight: string
+}
+
+function hasValidWeight(team: TeamInput): boolean {
+  const parsed = Number(team.weight)
+  return team.weight.trim() !== '' && !Number.isNaN(parsed) && parsed >= MIN_WEIGHT
 }
 
 export default function Page() {
@@ -123,6 +129,9 @@ export default function Page() {
     return <LiveDraftView commissionerToken={commissionerToken} league={league} teams={teams} />
   }
 
+  const hasInvalidWeight = league.mode === 'weighted' && teamInputs.some((t) => !hasValidWeight(t))
+  const startDraftDisabled = isSaving || hasInvalidWeight
+
   return (
     <main className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-bold">{league.name}</h1>
@@ -165,13 +174,18 @@ export default function Page() {
         </button>
         <button
           onClick={startDraft}
-          disabled={isSaving}
+          disabled={startDraftDisabled}
           className="bg-black text-white rounded px-4 py-2 disabled:opacity-50"
         >
           Start Draft
         </button>
       </div>
 
+      {hasInvalidWeight && (
+        <p className="mt-3 text-amber-700">
+          Every team needs a weight of at least {MIN_WEIGHT} before you can start a weighted draft.
+        </p>
+      )}
       {error && <p className="mt-3 text-red-600">{error}</p>}
     </main>
   )

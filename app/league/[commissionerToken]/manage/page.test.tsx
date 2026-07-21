@@ -160,6 +160,62 @@ describe('Commissioner manage page (setup)', () => {
   })
 })
 
+describe('Commissioner manage page (weighted mode)', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (!init && url.includes('/api/leagues/')) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'weighted',
+                status: 'setup',
+                revealedCount: 0,
+              },
+              teams: [
+                { id: 't1', name: 'Team A', weight: null },
+                { id: 't2', name: 'Team B', weight: 2 },
+              ],
+            },
+          }),
+        })
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+  })
+
+  it('disables Start Draft when a team has no weight', async () => {
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /start draft/i }))
+
+    expect(screen.getByRole('button', { name: /start draft/i })).toBeDisabled()
+  })
+
+  it('disables Start Draft when a team has a zero weight', async () => {
+    render(<Page />)
+    const weightInputs = await waitFor(() => screen.getAllByPlaceholderText(/weight/i))
+
+    fireEvent.change(weightInputs[0], { target: { value: '0' } })
+
+    expect(screen.getByRole('button', { name: /start draft/i })).toBeDisabled()
+  })
+
+  it('enables Start Draft once every team has a valid weight', async () => {
+    render(<Page />)
+    const weightInputs = await waitFor(() => screen.getAllByPlaceholderText(/weight/i))
+
+    expect(screen.getByRole('button', { name: /start draft/i })).toBeDisabled()
+
+    fireEvent.change(weightInputs[0], { target: { value: '1' } })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /start draft/i })).not.toBeDisabled())
+  })
+})
+
 describe('Commissioner manage page (live)', () => {
   beforeEach(() => {
     let revealedCount = 0
