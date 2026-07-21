@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { LotteryMode } from '@/lib/types'
+import { createLeagueSchema } from '@/lib/validation'
 
 export default function Page() {
   const router = useRouter()
@@ -14,18 +15,28 @@ export default function Page() {
     e.preventDefault()
     setError(null)
 
-    const response = await fetch('/api/leagues', {
-      method: 'POST',
-      body: JSON.stringify({ name, mode }),
-    })
-    const body = await response.json()
-
-    if (!body.success) {
-      setError(body.error)
+    const validation = createLeagueSchema.safeParse({ name, mode })
+    if (!validation.success) {
+      setError('League name must be between 1 and 100 characters')
       return
     }
 
-    router.push(`/league/${body.data.league.commissionerToken}/manage`)
+    try {
+      const response = await fetch('/api/leagues', {
+        method: 'POST',
+        body: JSON.stringify({ name, mode }),
+      })
+      const body = await response.json()
+
+      if (!body.success) {
+        setError(body.error)
+        return
+      }
+
+      router.push(`/league/${body.data.league.commissionerToken}/manage`)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    }
   }
 
   return (
@@ -38,6 +49,7 @@ export default function Page() {
             className="border rounded px-3 py-2"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={100}
             required
           />
         </label>
