@@ -96,8 +96,8 @@ export default function Page() {
     }
   }
 
-  if (league.status !== 'setup') {
-    return <main className="p-8">Draft is {league.status}. Reveal controls load in the next task.</main>
+  if (league.status === 'live' || league.status === 'complete') {
+    return <LiveDraftView commissionerToken={commissionerToken} league={league} />
   }
 
   return (
@@ -145,6 +145,54 @@ export default function Page() {
         </button>
       </div>
 
+      {error && <p className="mt-3 text-red-600">{error}</p>}
+    </main>
+  )
+}
+
+function LiveDraftView({ commissionerToken, league }: { commissionerToken: string; league: League }) {
+  const [revealed, setRevealed] = useState<{ teamId: string; teamName: string; slot: number }[]>([])
+  const [status, setStatus] = useState(league.status)
+  const [error, setError] = useState<string | null>(null)
+
+  async function revealNext() {
+    setError(null)
+    try {
+      const response = await fetch(`/api/leagues/${commissionerToken}/reveal`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevealedCount: revealed.length }),
+      })
+      const body = await response.json()
+      if (!body.success) {
+        setError(body.error || 'Failed to reveal pick')
+        return
+      }
+      setRevealed((prev) => [
+        ...prev,
+        { teamId: body.data.teamId, teamName: body.data.teamName, slot: body.data.slot },
+      ])
+      setStatus(body.data.status)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reveal pick'
+      setError(message)
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-2xl p-8">
+      <h1 className="text-2xl font-bold">{league.name}</h1>
+      <div className="mt-6 flex flex-col gap-2">
+        {revealed.map((pick, i) => (
+          <div key={i} className="border rounded px-4 py-2">
+            Slot {pick.slot} — {pick.teamName}
+          </div>
+        ))}
+      </div>
+      {status !== 'complete' && (
+        <button onClick={revealNext} className="mt-4 bg-black text-white rounded px-4 py-2">
+          Reveal Next Pick
+        </button>
+      )}
       {error && <p className="mt-3 text-red-600">{error}</p>}
     </main>
   )

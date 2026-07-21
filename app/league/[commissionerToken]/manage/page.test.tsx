@@ -109,3 +109,48 @@ describe('Commissioner manage page (setup)', () => {
     )
   })
 })
+
+describe('Commissioner manage page (live)', () => {
+  beforeEach(() => {
+    let revealedCount = 0
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith(`/api/leagues/commish-123`) && !init) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'random',
+                status: 'live',
+                revealedCount,
+              },
+              teams: [{ id: 't1', name: 'Team A' }],
+            },
+          }),
+        })
+      }
+      if (url.endsWith('/reveal')) {
+        revealedCount += 1
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: { teamId: 't1', teamName: 'Team A', slot: 1, status: 'complete' },
+          }),
+        })
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+  })
+
+  it('reveals the next pick when clicked', async () => {
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /reveal next pick/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /reveal next pick/i }))
+
+    await waitFor(() => expect(screen.getByText(/slot 1/i)).toBeDefined())
+  })
+})
