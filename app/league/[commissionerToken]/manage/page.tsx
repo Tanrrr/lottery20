@@ -15,6 +15,7 @@ export default function Page() {
   const [teams, setTeams] = useState<Team[]>([])
   const [teamInputs, setTeamInputs] = useState<TeamInput[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,7 +65,7 @@ export default function Page() {
     setTeamInputs((prev) => [...prev, { name: '', weight: '' }])
   }
 
-  async function saveTeams(): Promise<boolean> {
+  async function saveTeamsRequest(): Promise<boolean> {
     setError(null)
     try {
       const teams = teamInputs.map((t) => ({
@@ -88,10 +89,20 @@ export default function Page() {
     }
   }
 
+  async function saveTeams(): Promise<boolean> {
+    setIsSaving(true)
+    try {
+      return await saveTeamsRequest()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   async function startDraft() {
     setError(null)
+    setIsSaving(true)
     try {
-      const saved = await saveTeams()
+      const saved = await saveTeamsRequest()
       if (!saved) return
       const response = await fetch(`/api/leagues/${commissionerToken}/start`, { method: 'POST' })
       const body = await response.json()
@@ -103,6 +114,8 @@ export default function Page() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start draft'
       setError(message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -144,13 +157,17 @@ export default function Page() {
       </div>
 
       <div className="mt-4 flex gap-3">
-        <button onClick={addTeam} className="border rounded px-4 py-2">
+        <button onClick={addTeam} disabled={isSaving} className="border rounded px-4 py-2 disabled:opacity-50">
           Add team
         </button>
-        <button onClick={saveTeams} className="border rounded px-4 py-2">
+        <button onClick={saveTeams} disabled={isSaving} className="border rounded px-4 py-2 disabled:opacity-50">
           Save teams
         </button>
-        <button onClick={startDraft} className="bg-black text-white rounded px-4 py-2">
+        <button
+          onClick={startDraft}
+          disabled={isSaving}
+          className="bg-black text-white rounded px-4 py-2 disabled:opacity-50"
+        >
           Start Draft
         </button>
       </div>

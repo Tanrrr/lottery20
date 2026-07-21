@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
 import Page from './page'
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ commissionerToken: 'commish-123' }) }))
@@ -107,6 +108,55 @@ describe('Commissioner manage page (setup)', () => {
       expect.stringContaining('/start'),
       expect.anything()
     )
+  })
+
+  it('disables Save teams, Start Draft, and Add team while a save is in flight', async () => {
+    let resolvePut: (value: { json: () => Promise<unknown> }) => void = () => {}
+    const putPromise = new Promise<{ json: () => Promise<unknown> }>((resolve) => {
+      resolvePut = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (!init && url.includes('/api/leagues/')) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'random',
+                status: 'setup',
+                revealedCount: 0,
+              },
+              teams: [],
+            },
+          }),
+        })
+      }
+      if (init?.method === 'PUT' && url.includes('/teams')) {
+        return putPromise
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+    global.fetch = fetchMock
+
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /save teams/i }))
+
+    expect(screen.getByRole('button', { name: /save teams/i })).not.toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: /save teams/i }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /save teams/i })).toBeDisabled())
+    expect(screen.getByRole('button', { name: /start draft/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /add team/i })).toBeDisabled()
+
+    resolvePut({ json: async () => ({ success: true, data: [] }) })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /save teams/i })).not.toBeDisabled())
+    expect(screen.getByRole('button', { name: /start draft/i })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /add team/i })).not.toBeDisabled()
   })
 })
 
