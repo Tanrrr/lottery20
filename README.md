@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fantasy Draft Lottery
 
-## Getting Started
+A link-based website for running a fantasy football draft-order lottery, with a live bottom-up reveal.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `npm install`
+2. Create a Supabase project and apply both migrations in order:
+   - `supabase/migrations/0001_init.sql` (initial schema)
+   - `supabase/migrations/0002_atomic_replace_teams.sql` (adds atomic replace_league_teams function)
+   
+   See `docs/superpowers/plans/2026-07-20-fantasy-draft-lottery.md`, Task 10, for exact steps.
+3. Copy `.env.local.example` to `.env.local` and fill in your Supabase URL, anon key, and service role key.
+4. `npm run dev` and open http://localhost:3000.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Testing
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `npm test` — unit and component tests (fast, no network).
+- `npm run test:integration` — repository tests against your real Supabase project.
+- `npm run test:e2e` — Playwright end-to-end test against the running dev server.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
 
-## Learn More
+Deploy to Vercel; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as environment variables in the Vercel project settings (never commit them).
 
-To learn more about Next.js, take a look at the following resources:
+## Security notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `SUPABASE_SERVICE_ROLE_KEY` must only ever be read on the server (`lib/supabaseAdmin.ts`) — never expose it to the browser or a `NEXT_PUBLIC_*` variable.
+- Row Level Security is enabled on every table with no policies; all reads/writes go through server-side API routes using the service role key.
+- Commissioner access is a bearer token in the URL — anyone with the link can manage the league. There is no recovery if it's lost.
