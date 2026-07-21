@@ -31,13 +31,19 @@ export class MemoryLeagueRepository implements LeagueRepository {
   async getByCommissionerToken(token: string): Promise<LeagueWithTeams | null> {
     const league = [...this.leagues.values()].find((l) => l.commissionerToken === token)
     if (!league) return null
-    return { league: { ...league }, teams: [...(this.teamsByLeagueId.get(league.id) ?? [])] }
+    return {
+      league: { ...league, revealOrder: league.revealOrder ? [...league.revealOrder] : null },
+      teams: (this.teamsByLeagueId.get(league.id) ?? []).map((t) => ({ ...t })),
+    }
   }
 
   async getByViewerToken(token: string): Promise<LeagueWithTeams | null> {
     const league = [...this.leagues.values()].find((l) => l.viewerToken === token)
     if (!league) return null
-    return { league: { ...league }, teams: [...(this.teamsByLeagueId.get(league.id) ?? [])] }
+    return {
+      league: { ...league, revealOrder: league.revealOrder ? [...league.revealOrder] : null },
+      teams: (this.teamsByLeagueId.get(league.id) ?? []).map((t) => ({ ...t })),
+    }
   }
 
   async replaceTeams(
@@ -54,7 +60,7 @@ export class MemoryLeagueRepository implements LeagueRepository {
       weight: t.weight ?? null,
     }))
     this.teamsByLeagueId.set(league.id, newTeams)
-    return [...newTeams]
+    return newTeams.map((t) => ({ ...t }))
   }
 
   async startDraft(commissionerToken: string, revealOrder: string[]): Promise<League> {
@@ -63,7 +69,7 @@ export class MemoryLeagueRepository implements LeagueRepository {
 
     const updated: League = { ...league, status: 'live', revealOrder: [...revealOrder], revealedCount: 0 }
     this.leagues.set(league.id, updated)
-    return { ...updated }
+    return { ...updated, revealOrder: updated.revealOrder ? [...updated.revealOrder] : null }
   }
 
   async revealNext(commissionerToken: string, expectedRevealedCount: number): Promise<RevealResult> {
@@ -84,7 +90,7 @@ export class MemoryLeagueRepository implements LeagueRepository {
     }
     this.leagues.set(league.id, updated)
 
-    return { league: { ...updated }, revealedTeamId, slot }
+    return { league: { ...updated, revealOrder: updated.revealOrder ? [...updated.revealOrder] : null }, revealedTeamId, slot }
   }
 
   async checkRateLimit(
