@@ -17,10 +17,13 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadLeague() {
       try {
         const response = await fetch(`/api/leagues/${commissionerToken}`)
         const body = await response.json()
+        if (cancelled) return
         if (body.success) {
           setLeague(body.data.league)
           setTeams(body.data.teams)
@@ -31,11 +34,16 @@ export default function Page() {
           setError(body.error || 'Failed to load league')
         }
       } catch (err) {
+        if (cancelled) return
         const message = err instanceof Error ? err.message : 'Failed to load league'
         setError(message)
       }
     }
     loadLeague()
+
+    return () => {
+      cancelled = true
+    }
   }, [commissionerToken])
 
   if (error && !league) {

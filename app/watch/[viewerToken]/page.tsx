@@ -11,21 +11,29 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadLeague() {
       try {
         const response = await fetch(`/api/view/${viewerToken}`)
         const body = await response.json()
+        if (cancelled) return
         if (body.success) {
           setState(body.data)
         } else {
           setError(body.error || 'Failed to load league')
         }
       } catch (err) {
+        if (cancelled) return
         const message = err instanceof Error ? err.message : 'Failed to load league'
         setError(message)
       }
     }
     loadLeague()
+
+    return () => {
+      cancelled = true
+    }
   }, [viewerToken])
 
   useEffect(() => {
