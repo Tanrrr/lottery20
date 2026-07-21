@@ -12,6 +12,7 @@ interface TeamInput {
 export default function Page() {
   const { commissionerToken } = useParams<{ commissionerToken: string }>()
   const [league, setLeague] = useState<League | null>(null)
+  const [teams, setTeams] = useState<Team[]>([])
   const [teamInputs, setTeamInputs] = useState<TeamInput[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -22,6 +23,7 @@ export default function Page() {
         const body = await response.json()
         if (body.success) {
           setLeague(body.data.league)
+          setTeams(body.data.teams)
           setTeamInputs(
             body.data.teams.map((t: Team) => ({ name: t.name, weight: t.weight?.toString() ?? '' }))
           )
@@ -97,7 +99,7 @@ export default function Page() {
   }
 
   if (league.status === 'live' || league.status === 'complete') {
-    return <LiveDraftView commissionerToken={commissionerToken} league={league} />
+    return <LiveDraftView commissionerToken={commissionerToken} league={league} teams={teams} />
   }
 
   return (
@@ -150,8 +152,31 @@ export default function Page() {
   )
 }
 
-function LiveDraftView({ commissionerToken, league }: { commissionerToken: string; league: League }) {
-  const [revealed, setRevealed] = useState<{ teamId: string; teamName: string; slot: number }[]>([])
+function LiveDraftView({
+  commissionerToken,
+  league,
+  teams,
+}: {
+  commissionerToken: string
+  league: League
+  teams: Team[]
+}) {
+  const teamsById = new Map(teams.map((t) => [t.id, t]))
+  const computeInitialRevealed = () => {
+    if (!league.revealOrder || league.revealedCount === 0) return []
+    return league.revealOrder.slice(0, league.revealedCount).map((teamId, index) => {
+      const totalTeams = league.revealOrder!.length
+      return {
+        teamId,
+        teamName: teamsById.get(teamId)?.name ?? 'Unknown team',
+        slot: totalTeams - index,
+      }
+    })
+  }
+
+  const [revealed, setRevealed] = useState<{ teamId: string; teamName: string; slot: number }[]>(
+    computeInitialRevealed
+  )
   const [status, setStatus] = useState(league.status)
   const [error, setError] = useState<string | null>(null)
 

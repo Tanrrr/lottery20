@@ -153,4 +153,97 @@ describe('Commissioner manage page (live)', () => {
 
     await waitFor(() => expect(screen.getByText(/slot 1/i)).toBeDefined())
   })
+
+  it('reconstructs already-revealed picks on mount', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith(`/api/leagues/commish-123`) && !init) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'random',
+                status: 'live',
+                revealedCount: 2,
+                revealOrder: ['t1', 't2', 't3'],
+              },
+              teams: [
+                { id: 't1', name: 'Team A' },
+                { id: 't2', name: 'Team B' },
+                { id: 't3', name: 'Team C' },
+              ],
+            },
+          }),
+        })
+      }
+      if (url.endsWith('/reveal')) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: { teamId: 't3', teamName: 'Team C', slot: 1, status: 'complete' },
+          }),
+        })
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+
+    render(<Page />)
+    await waitFor(() => expect(screen.getByText(/slot 3/i)).toBeDefined())
+    await waitFor(() => expect(screen.getByText(/slot 2/i)).toBeDefined())
+  })
+
+  it('sends correct expectedRevealedCount when revealing after reconstruction', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith(`/api/leagues/commish-123`) && !init) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'random',
+                status: 'live',
+                revealedCount: 2,
+                revealOrder: ['t1', 't2', 't3'],
+              },
+              teams: [
+                { id: 't1', name: 'Team A' },
+                { id: 't2', name: 'Team B' },
+                { id: 't3', name: 'Team C' },
+              ],
+            },
+          }),
+        })
+      }
+      if (url.endsWith('/reveal')) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: { teamId: 't3', teamName: 'Team C', slot: 1, status: 'complete' },
+          }),
+        })
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+    global.fetch = fetchMock
+
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /reveal next pick/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /reveal next pick/i }))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/reveal'),
+        expect.objectContaining({
+          body: expect.stringContaining('"expectedRevealedCount":2'),
+        })
+      )
+    )
+  })
 })
