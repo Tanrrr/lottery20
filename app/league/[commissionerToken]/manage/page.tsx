@@ -36,6 +36,14 @@ export default function Page() {
     loadLeague()
   }, [commissionerToken])
 
+  if (error && !league) {
+    return (
+      <main className="p-8">
+        <p className="text-red-600">{error}</p>
+      </main>
+    )
+  }
+
   if (!league) return <main className="p-8">Loading...</main>
 
   function updateTeam(index: number, field: keyof TeamInput, value: string) {
@@ -46,7 +54,7 @@ export default function Page() {
     setTeamInputs((prev) => [...prev, { name: '', weight: '' }])
   }
 
-  async function saveTeams() {
+  async function saveTeams(): Promise<boolean> {
     setError(null)
     try {
       const teams = teamInputs.map((t) => ({
@@ -60,17 +68,21 @@ export default function Page() {
       const body = await response.json()
       if (!body.success) {
         setError(body.error || 'Failed to save teams')
+        return false
       }
+      return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save teams'
       setError(message)
+      return false
     }
   }
 
   async function startDraft() {
     setError(null)
     try {
-      await saveTeams()
+      const saved = await saveTeams()
+      if (!saved) return
       const response = await fetch(`/api/leagues/${commissionerToken}/start`, { method: 'POST' })
       const body = await response.json()
       if (!body.success) {
