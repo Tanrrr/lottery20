@@ -46,7 +46,10 @@ export async function startDraft(
 
   if (existing.teams.length < MIN_TEAMS) return fail(`At least ${MIN_TEAMS} teams are required`)
 
-  const modeCheck = validateTeamsForMode(existing.teams, existing.league.mode)
+  const modeCheck = validateTeamsForMode(
+    existing.teams.map((t) => ({ name: t.name, weight: t.weight ?? undefined })),
+    existing.league.mode
+  )
   if (!modeCheck.valid) return fail(modeCheck.error ?? 'Invalid team weights')
 
   const teamIds = existing.teams.map((t) => t.id)
