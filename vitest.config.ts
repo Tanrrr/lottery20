@@ -13,8 +13,5 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
-    environmentMatchGlobs: [
-      ['app/api/**', 'node'],
-    ],
-  } as unknown as Record<string, unknown>,
+  },
 })
