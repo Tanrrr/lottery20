@@ -4,6 +4,7 @@ import { enforceRateLimit } from '@/lib/rateLimit'
 import { broadcastReveal } from '@/lib/realtime'
 import { SupabaseLeagueRepository } from '@/lib/repository.supabase'
 import { fail } from '@/lib/apiResponse'
+import { REVEAL_RATE_LIMIT_MAX_REQUESTS } from '@/lib/constants'
 
 const repo = new SupabaseLeagueRepository()
 
@@ -13,8 +14,11 @@ export async function POST(
 ) {
   try {
     const { commissionerToken } = await params
-    const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-    const limited = await enforceRateLimit(repo, `${ip}:POST:/api/leagues/reveal`)
+    // Keyed per-league (not per-IP-globally): revealing a draft is a bounded,
+    // commissioner-initiated action capped at MAX_TEAMS reveals per league, so
+    // it shouldn't share the general per-IP abuse-prevention budget with other
+    // routes/leagues.
+    const limited = await enforceRateLimit(repo, `${commissionerToken}:reveal`, REVEAL_RATE_LIMIT_MAX_REQUESTS)
     if (limited) return NextResponse.json(limited, { status: 429 })
 
     const body = await request.json()

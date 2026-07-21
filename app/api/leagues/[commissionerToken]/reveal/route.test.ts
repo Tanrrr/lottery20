@@ -21,8 +21,9 @@ import { PUT as putTeams } from '../teams/route'
 import { POST as startRoute } from '../start/route'
 import { POST } from './route'
 import { broadcastReveal } from '@/lib/realtime'
+import { MAX_TEAMS } from '@/lib/constants'
 
-async function createLiveLeague() {
+async function createLiveLeague(teamCount = 6) {
   const createResponse = await createLeagueRoute(
     new NextRequest('http://localhost/api/leagues', {
       method: 'POST',
@@ -35,7 +36,7 @@ async function createLiveLeague() {
   await putTeams(
     new NextRequest(`http://localhost/api/leagues/${token}/teams`, {
       method: 'PUT',
-      body: JSON.stringify({ teams: Array.from({ length: 6 }, (_, i) => ({ name: `Team ${i}` })) }),
+      body: JSON.stringify({ teams: Array.from({ length: teamCount }, (_, i) => ({ name: `Team ${i}` })) }),
     }),
     { params: Promise.resolve({ commissionerToken: token }) }
   )
@@ -44,6 +45,16 @@ async function createLiveLeague() {
   })
 
   return token
+}
+
+async function reveal(token: string, expectedRevealedCount: number) {
+  return POST(
+    new NextRequest(`http://localhost/api/leagues/${token}/reveal`, {
+      method: 'POST',
+      body: JSON.stringify({ expectedRevealedCount }),
+    }),
+    { params: Promise.resolve({ commissionerToken: token }) }
+  )
 }
 
 describe('POST /api/leagues/[commissionerToken]/reveal', () => {
@@ -80,5 +91,26 @@ describe('POST /api/leagues/[commissionerToken]/reveal', () => {
       { params: Promise.resolve({ commissionerToken: token }) }
     )
     expect(response.status).toBe(409)
+  })
+
+  it('does not rate-limit a full MAX_TEAMS-sized draft revealed back-to-back', async () => {
+    const token = await createLiveLeague(MAX_TEAMS)
+
+    for (let i = 0; i < MAX_TEAMS; i++) {
+      const response = await reveal(token, i)
+      expect(response.status).toBe(200)
+    }
+  })
+
+  it('does not let one league\'s reveal calls exhaust another league\'s rate-limit budget', async () => {
+    const tokenA = await createLiveLeague(MAX_TEAMS)
+    const tokenB = await createLiveLeague()
+
+    for (let i = 0; i < MAX_TEAMS; i++) {
+      await reveal(tokenA, i)
+    }
+
+    const response = await reveal(tokenB, 0)
+    expect(response.status).toBe(200)
   })
 })
