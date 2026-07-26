@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import Page from './page'
 import type { RevealBroadcastPayload } from '@/lib/realtime'
@@ -46,5 +46,43 @@ describe('Viewer page', () => {
     })
 
     await waitFor(() => expect(screen.getByText(/slot 5/i)).toBeInTheDocument())
+  })
+
+  it('shows a tap-to-enable-sound prompt before the first interaction', async () => {
+    render(<Page />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /enable sound/i })).toBeInTheDocument())
+  })
+
+  it('hides the sound prompt and does not block the reveal animation after tapping it', async () => {
+    render(<Page />)
+    const enableButton = await waitFor(() => screen.getByRole('button', { name: /enable sound/i }))
+
+    fireEvent.click(enableButton)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /enable sound/i })).not.toBeInTheDocument())
+  })
+
+  it('does not duplicate a pick between its animation and the settled list', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(<Page />)
+    await waitFor(() => expect(capturedOnReveal).not.toBeNull())
+
+    act(() => {
+      capturedOnReveal!({ teamId: 't2', teamName: 'Team B', slot: 5, status: 'live' })
+    })
+
+    // While the animation plays, exactly one "Slot 5 — Team B" node exists
+    // (rendered by RevealAnimation) — not a second one from the settled list.
+    await waitFor(() => expect(screen.getAllByText(/^Slot 5 —.*Team B/)).toHaveLength(1))
+
+    act(() => {
+      vi.advanceTimersByTime(3000)
+    })
+
+    // After the animation completes and unmounts, still exactly one — now
+    // rendered by the settled list instead.
+    await waitFor(() => expect(screen.getAllByText(/^Slot 5 —.*Team B/)).toHaveLength(1))
+
+    vi.useRealTimers()
   })
 })

@@ -1,14 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { subscribeToReveals } from '@/lib/realtimeClient'
+import RevealAnimation from '@/components/RevealAnimation'
+import { REVEAL_SOUND_SRC } from '@/lib/constants'
 import type { PublicLeagueState } from '@/lib/types'
+
+interface PendingPick {
+  teamId: string
+  teamName: string
+  slot: number
+  status: PublicLeagueState['status']
+}
 
 export default function Page() {
   const { viewerToken } = useParams<{ viewerToken: string }>()
   const [state, setState] = useState<PublicLeagueState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pendingPick, setPendingPick] = useState<PendingPick | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(false)
+  const primerRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -39,17 +51,39 @@ export default function Page() {
   useEffect(() => {
     if (!state || state.status === 'complete') return
     return subscribeToReveals(viewerToken, (payload) => {
-      setState((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          status: payload.status,
-          revealed: [...prev.revealed, { teamId: payload.teamId, teamName: payload.teamName, slot: payload.slot }],
-        }
+      setPendingPick({
+        teamId: payload.teamId,
+        teamName: payload.teamName,
+        slot: payload.slot,
+        status: payload.status,
       })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerToken, state?.status])
+
+  function handleAnimationComplete() {
+    if (!pendingPick) return
+    setState((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        status: pendingPick.status,
+        revealed: [...prev.revealed, { teamId: pendingPick.teamId, teamName: pendingPick.teamName, slot: pendingPick.slot }],
+      }
+    })
+    setPendingPick(null)
+  }
+
+  function enableSound() {
+    const audio = primerRef.current
+    if (audio) {
+      audio
+        .play()
+        .then(() => audio.pause())
+        .catch(() => {})
+    }
+    setSoundEnabled(true)
+  }
 
   if (error && !state) {
     return (
@@ -65,6 +99,15 @@ export default function Page() {
     <main className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-bold">{state.name}</h1>
       <p className="text-sm text-gray-600">{state.teamCount} teams &middot; {state.status}</p>
+      {!soundEnabled && (
+        <button
+          onClick={enableSound}
+          className="mt-3 border rounded px-4 py-2 text-sm"
+        >
+          🔊 Tap to enable sound
+        </button>
+      )}
+      <audio ref={primerRef} src={REVEAL_SOUND_SRC} />
       <div className="mt-6 flex flex-col gap-2">
         {state.revealed.map((pick, i) => (
           <div key={i} className="border rounded px-4 py-2 animate-in fade-in">
@@ -72,6 +115,13 @@ export default function Page() {
           </div>
         ))}
       </div>
+      {pendingPick && (
+        <RevealAnimation
+          key={pendingPick.slot}
+          pick={{ slot: pendingPick.slot, teamName: pendingPick.teamName }}
+          onComplete={handleAnimationComplete}
+        />
+      )}
     </main>
   )
 }
