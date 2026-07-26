@@ -352,4 +352,25 @@ describe('Commissioner manage page (live)', () => {
       )
     )
   })
+
+  it('disables Reveal Next Pick while the reveal animation is playing', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /reveal next pick/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /reveal next pick/i }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /reveal next pick/i })).toBeDisabled())
+
+    vi.advanceTimersByTime(3000)
+
+    // Status resolves to 'complete' in this fixture, so the button disappears
+    // entirely once the animation finishes rather than re-enabling.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /reveal next pick/i })).not.toBeInTheDocument()
+    )
+
+    vi.useRealTimers()
+  })
 })

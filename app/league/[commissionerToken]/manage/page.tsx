@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import type { League, Team } from '@/lib/types'
 import { MIN_WEIGHT } from '@/lib/constants'
+import RevealAnimation from '@/components/RevealAnimation'
 
 interface TeamInput {
   name: string
@@ -216,6 +217,9 @@ function LiveDraftView({
   const [revealed, setRevealed] = useState<{ teamId: string; teamName: string; slot: number }[]>(
     computeInitialRevealed
   )
+  const [pendingPick, setPendingPick] = useState<{ teamId: string; teamName: string; slot: number } | null>(
+    null
+  )
   const [status, setStatus] = useState(league.status)
   const [error, setError] = useState<string | null>(null)
 
@@ -231,15 +235,18 @@ function LiveDraftView({
         setError(body.error || 'Failed to reveal pick')
         return
       }
-      setRevealed((prev) => [
-        ...prev,
-        { teamId: body.data.teamId, teamName: body.data.teamName, slot: body.data.slot },
-      ])
+      setPendingPick({ teamId: body.data.teamId, teamName: body.data.teamName, slot: body.data.slot })
       setStatus(body.data.status)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reveal pick'
       setError(message)
     }
+  }
+
+  function handleAnimationComplete() {
+    if (!pendingPick) return
+    setRevealed((prev) => [...prev, pendingPick])
+    setPendingPick(null)
   }
 
   return (
@@ -252,8 +259,13 @@ function LiveDraftView({
           </div>
         ))}
       </div>
-      {status !== 'complete' && (
-        <button onClick={revealNext} className="mt-4 bg-black text-white rounded px-4 py-2">
+      {pendingPick && <RevealAnimation key={pendingPick.slot} pick={pendingPick} onComplete={handleAnimationComplete} />}
+      {(status !== 'complete' || pendingPick !== null) && (
+        <button
+          onClick={revealNext}
+          disabled={pendingPick !== null}
+          className="mt-4 bg-black text-white rounded px-4 py-2 disabled:opacity-50"
+        >
           Reveal Next Pick
         </button>
       )}
