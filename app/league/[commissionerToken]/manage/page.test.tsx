@@ -373,4 +373,57 @@ describe('Commissioner manage page (live)', () => {
 
     vi.useRealTimers()
   })
+
+  it('disables Reveal Next Pick immediately while the reveal fetch is in flight (prevents double-click)', async () => {
+    let resolveReveal: (value: { json: () => Promise<unknown> }) => void = () => {}
+    const revealPromise = new Promise<{ json: () => Promise<unknown> }>((resolve) => {
+      resolveReveal = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith(`/api/leagues/commish-123`) && !init) {
+        return Promise.resolve({
+          json: async () => ({
+            success: true,
+            data: {
+              league: {
+                commissionerToken: 'commish-123',
+                viewerToken: 'viewer-456',
+                name: 'My League',
+                mode: 'random',
+                status: 'live',
+                revealedCount: 0,
+              },
+              teams: [{ id: 't1', name: 'Team A' }],
+            },
+          }),
+        })
+      }
+      if (url.endsWith('/reveal')) {
+        return revealPromise
+      }
+      return Promise.resolve({ json: async () => ({ success: true, data: [] }) })
+    }) as unknown as typeof fetch
+    global.fetch = fetchMock
+
+    render(<Page />)
+    await waitFor(() => screen.getByRole('button', { name: /reveal next pick/i }))
+
+    expect(screen.getByRole('button', { name: /reveal next pick/i })).not.toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: /reveal next pick/i }))
+
+    // Button should be disabled immediately while fetch is in flight (isRevealing = true)
+    await waitFor(() => expect(screen.getByRole('button', { name: /reveal next pick/i })).toBeDisabled())
+
+    // Resolve the pending fetch
+    resolveReveal({
+      json: async () => ({
+        success: true,
+        data: { teamId: 't1', teamName: 'Team A', slot: 1, status: 'complete' },
+      }),
+    })
+
+    // Button stays disabled after fetch completes due to animation (pendingPick !== null)
+    await waitFor(() => expect(screen.getByRole('button', { name: /reveal next pick/i })).toBeDisabled())
+  })
 })

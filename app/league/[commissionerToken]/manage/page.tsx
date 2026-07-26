@@ -222,9 +222,11 @@ function LiveDraftView({
   )
   const [status, setStatus] = useState(league.status)
   const [error, setError] = useState<string | null>(null)
+  const [isRevealing, setIsRevealing] = useState(false)
 
   async function revealNext() {
     setError(null)
+    setIsRevealing(true)
     try {
       const response = await fetch(`/api/leagues/${commissionerToken}/reveal`, {
         method: 'POST',
@@ -240,6 +242,8 @@ function LiveDraftView({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reveal pick'
       setError(message)
+    } finally {
+      setIsRevealing(false)
     }
   }
 
@@ -263,7 +267,7 @@ function LiveDraftView({
       {(status !== 'complete' || pendingPick !== null) && (
         <button
           onClick={revealNext}
-          disabled={pendingPick !== null}
+          disabled={pendingPick !== null || isRevealing}
           className="mt-4 bg-black text-white rounded px-4 py-2 disabled:opacity-50"
         >
           Reveal Next Pick

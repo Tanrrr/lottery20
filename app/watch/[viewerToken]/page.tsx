@@ -111,7 +111,7 @@ export default function Page() {
           🔊 Tap to enable sound
         </button>
       )}
-      <audio ref={primerRef} src={REVEAL_SOUND_SRC} />
+      <audio ref={primerRef} src={REVEAL_SOUND_SRC} muted />
       <div className="mt-6 flex flex-col gap-2">
         {state.revealed.map((pick, i) => (
           <div key={i} className="border rounded px-4 py-2 animate-in fade-in">

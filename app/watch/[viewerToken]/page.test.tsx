@@ -62,6 +62,14 @@ describe('Viewer page', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /enable sound/i })).not.toBeInTheDocument())
   })
 
+  it('mutes the primer audio element to avoid audible blips', async () => {
+    render(<Page />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /enable sound/i })).toBeInTheDocument())
+
+    const audioElement = document.querySelector('audio')
+    expect(audioElement?.muted).toBe(true)
+  })
+
   it('does not duplicate a pick between its animation and the settled list', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     render(<Page />)
