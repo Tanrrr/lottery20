@@ -7,3 +7,5 @@ export const RATE_LIMIT_WINDOW_MS = 60_000
 // ever happen for one league), not a general abuse vector like league creation,
 // so it gets its own higher ceiling keyed per-league instead of per-IP-globally.
 export const REVEAL_RATE_LIMIT_MAX_REQUESTS = 50
+export const REVEAL_ANIMATION_MS = 2600
+export const REVEAL_SOUND_SRC = '/sounds/reveal-suspense.mp3'
