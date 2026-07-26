@@ -18,7 +18,8 @@ export default function Page() {
   const { viewerToken } = useParams<{ viewerToken: string }>()
   const [state, setState] = useState<PublicLeagueState | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pendingPick, setPendingPick] = useState<PendingPick | null>(null)
+  const [pendingQueue, setPendingQueue] = useState<PendingPick[]>([])
+  const currentPick = pendingQueue[0] ?? null
   const [soundEnabled, setSoundEnabled] = useState(false)
   const primerRef = useRef<HTMLAudioElement>(null)
 
@@ -51,27 +52,30 @@ export default function Page() {
   useEffect(() => {
     if (!state || state.status === 'complete') return
     return subscribeToReveals(viewerToken, (payload) => {
-      setPendingPick({
-        teamId: payload.teamId,
-        teamName: payload.teamName,
-        slot: payload.slot,
-        status: payload.status,
-      })
+      setPendingQueue((prev) => [
+        ...prev,
+        {
+          teamId: payload.teamId,
+          teamName: payload.teamName,
+          slot: payload.slot,
+          status: payload.status,
+        },
+      ])
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerToken, state?.status])
 
   function handleAnimationComplete() {
-    if (!pendingPick) return
+    if (!currentPick) return
     setState((prev) => {
       if (!prev) return prev
       return {
         ...prev,
-        status: pendingPick.status,
-        revealed: [...prev.revealed, { teamId: pendingPick.teamId, teamName: pendingPick.teamName, slot: pendingPick.slot }],
+        status: currentPick.status,
+        revealed: [...prev.revealed, { teamId: currentPick.teamId, teamName: currentPick.teamName, slot: currentPick.slot }],
       }
     })
-    setPendingPick(null)
+    setPendingQueue((prev) => prev.slice(1))
   }
 
   function enableSound() {
@@ -115,10 +119,10 @@ export default function Page() {
           </div>
         ))}
       </div>
-      {pendingPick && (
+      {currentPick && (
         <RevealAnimation
-          key={pendingPick.slot}
-          pick={{ slot: pendingPick.slot, teamName: pendingPick.teamName }}
+          key={currentPick.slot}
+          pick={{ slot: currentPick.slot, teamName: currentPick.teamName }}
           onComplete={handleAnimationComplete}
         />
       )}

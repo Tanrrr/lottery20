@@ -85,4 +85,51 @@ describe('Viewer page', () => {
 
     vi.useRealTimers()
   })
+
+  it('does not drop a pick when a second broadcast arrives before the first animation completes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(<Page />)
+    await waitFor(() => expect(capturedOnReveal).not.toBeNull())
+
+    // First broadcast starts its ~2.6s animation.
+    act(() => {
+      capturedOnReveal!({ teamId: 't2', teamName: 'Team B', slot: 5, status: 'live' })
+    })
+    await waitFor(() => expect(screen.getByText(/^Slot 5 —.*Team B/)).toBeInTheDocument())
+
+    // Second broadcast arrives mid-animation, before slot 5's onComplete fires.
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    act(() => {
+      capturedOnReveal!({ teamId: 't3', teamName: 'Team C', slot: 4, status: 'live' })
+    })
+
+    // Slot 5's animation must still be allowed to finish (not interrupted/unmounted).
+    expect(screen.getByText(/^Slot 5 —.*Team B/)).toBeInTheDocument()
+    expect(screen.queryByText(/^Slot 4 —.*Team C/)).not.toBeInTheDocument()
+
+    // Let slot 5's animation finish (remaining ~2.1s of its 2.6s timer).
+    act(() => {
+      vi.advanceTimersByTime(2200)
+    })
+
+    // Slot 5 must have settled into the revealed list, and slot 4 must now be
+    // animating (queued, not dropped).
+    await waitFor(() => expect(screen.getByText(/^Slot 4 —.*Team C/)).toBeInTheDocument())
+
+    act(() => {
+      vi.advanceTimersByTime(3000)
+    })
+
+    // Both picks must eventually appear, in order, none dropped.
+    await waitFor(() => {
+      const settled = screen.getAllByText(/^Slot \d+ —/)
+      const slots = settled.map((el) => el.textContent)
+      expect(slots.some((t) => /Slot 5 —.*Team B/.test(t ?? ''))).toBe(true)
+      expect(slots.some((t) => /Slot 4 —.*Team C/.test(t ?? ''))).toBe(true)
+    })
+
+    vi.useRealTimers()
+  })
 })
