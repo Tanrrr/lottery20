@@ -1,4 +1,4 @@
-# Fantasy Draft Lottery
+# DraftNight
 
 A link-based web app for running a fantasy football draft-order lottery. A league commissioner sets up teams, runs a random or weighted draw, and reveals the results one pick at a time (worst to first) to a live, shareable viewer page — no accounts or sign-in required.
 
